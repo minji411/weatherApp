@@ -19,15 +19,17 @@ public class GameManager : MonoBehaviour
     public GameObject sunny;
     public GameObject rain;
     public GameObject cloud;
+    public GameObject snow;
     public Text state;
     public Text time;
     public string baseDate;
     public string baseTime;
 
     public Material lightskybox;
+    public Material littlecloudskybox;
     public Material cloudskybox;
 
-    public WeatherState  nowWeather;
+    public WeatherState nowWeather;
 
     void Start()
     {
@@ -40,7 +42,8 @@ public class GameManager : MonoBehaviour
         time.text = DateTime.Now.ToString(("yyyy-MM-dd tt HH:mm:ss"));
     }
 
-    bool WaitCondition() {
+    bool WaitCondition()
+    {
         state.text = "GPS 꺼져 있음";
         return Input.location.isEnabledByUser;
     }
@@ -87,10 +90,8 @@ public class GameManager : MonoBehaviour
 
             baseDate = DateTime.Now.ToString(("yyyyMMdd"));
             baseTime = DateTime.Now.ToString(("HHmm"));
-            //_getAPI.StartGetWeather(baseDate, baseTime, nx, ny);
 
             // 날씨 API로 넘어가기
-            //StartCoroutine(GetWeather(latitude, longitude));
             StartCoroutine(GetWeather(baseDate, baseTime, nx, ny));
         }
 
@@ -136,7 +137,7 @@ public class GameManager : MonoBehaviour
 
     IEnumerator GetWeather(string baseDate, string baseTime, int nx = 60, int ny = 127)
     {
-        string serviceKey = "";
+        string serviceKey = "vgmMOjb9HXtZVJOcHkChOttoFTbGqaTPIXoECVG7JG17ggjxxKhctweGOp02xjAKQwHeXxcB3op4yfT4b6mc9Q%3D%3D";
         string url = $"https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst"
             + $"?serviceKey={serviceKey}"
             + $"&pageNo=1&numOfRows=1000&dataType=JSON"
@@ -167,13 +168,13 @@ public class GameManager : MonoBehaviour
                     resultC = int.Parse(item.obsrValue);
             }
 
-            ApplyWeatherRainyEffect(resultR); 
+            ApplyWeatherRainyEffect(resultR);
             ApplyWeatherCloudEffect(resultC);
         }
         else
         {
             Debug.LogError(request.error);
-            
+
             state.text = "날씨 정보 요청 실패: " + request.error;
         }
     }
@@ -186,88 +187,59 @@ public class GameManager : MonoBehaviour
 
     void ApplyWeatherRainyEffect(int weather)
     {
+        sunny.SetActive(false);
+        rain.SetActive(false);
+        cloud.SetActive(false);
         switch (weather)
         {
             case 0:
-                Sunny();
+                sunny.SetActive(true);
+                nowWeather = WeatherState.Sunny;
                 break;
 
-            case 1: case 2: case 4:
-                Rain();
+            case 1:
+            case 2:
+            case 4:
+                rain.SetActive(true);
+                nowWeather = WeatherState.Rainy;
                 break;
-                
+
             case 3:
-                Snow();
+                snow.SetActive(true);
+                nowWeather = WeatherState.Snowy;
                 break;
 
             default:
-                sunny.SetActive(false);
-                rain.SetActive(false);
-                cloud.SetActive(false);
                 break;
         }
     }
     void ApplyWeatherCloudEffect(int weather)
     {
         if (nowWeather == WeatherState.Sunny)
-        switch (weather)
         {
-            case 1:
-                Sunny();
-                break;
+            switch (weather)
+            {
+                case 1:
+                    RenderSettings.skybox = lightskybox;
+                    break;
 
-            case 3:
-                Rain();
-                break;
-                
-            case 4:
-                Cloud();
-                break;
+                case 3:
+                    RenderSettings.skybox = littlecloudskybox;
+                    nowWeather = WeatherState.Cloudy;
+                    break;
 
-            default:
-                sunny.SetActive(false);
-                rain.SetActive(false);
-                cloud.SetActive(false);
-                break;
+                case 4:
+                    RenderSettings.skybox = cloudskybox;
+                    nowWeather = WeatherState.Cloudy;
+                    break;
+
+                default:
+                    break;
+            }
         }
-    }
-
-    private void Sunny(){
-        sunny.SetActive(true);
-        rain.SetActive(false);
-        cloud.SetActive(false);
-
-        nowWeather = WeatherState.Sunny;
-
-        RenderSettings.skybox = lightskybox;
-    }
-    
-    private void Rain(){
-        sunny.SetActive(false);
-        rain.SetActive(true);
-        cloud.SetActive(false);
-        
-        nowWeather = WeatherState.Rainy;
-
-        RenderSettings.skybox = cloudskybox;
-    }
-    
-    private void Cloud(){
-        sunny.SetActive(false);
-        rain.SetActive(false);
-        cloud.SetActive(true);
-        
-        nowWeather = WeatherState.Cloudy;
-
-        RenderSettings.skybox = cloudskybox;
-    }
-    private void Snow(){
-        sunny.SetActive(false);
-        rain.SetActive(false);
-        cloud.SetActive(true);
-        
-        nowWeather = WeatherState.Snowy;
-
-        RenderSettings.skybox = cloudskybox;
+        else
+        {
+            RenderSettings.skybox = cloudskybox;
+        }
     }
 }
