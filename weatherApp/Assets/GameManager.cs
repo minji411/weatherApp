@@ -6,6 +6,14 @@ using UnityEngine.Android;
 using UnityEngine.Networking;
 using UnityEngine.UI;
 
+public enum WeatherState
+{
+    Sunny,
+    Cloudy,
+    Rainy,
+    Snowy
+}
+
 public class GameManager : MonoBehaviour
 {
     public GameObject sunny;
@@ -13,9 +21,13 @@ public class GameManager : MonoBehaviour
     public GameObject cloud;
     public Text state;
     public Text time;
+    public string baseDate;
+    public string baseTime;
 
     public Material lightskybox;
     public Material cloudskybox;
+
+    public WeatherState  nowWeather;
 
     void Start()
     {
@@ -68,49 +80,101 @@ public class GameManager : MonoBehaviour
             Debug.Log($"위도: {latitude}, 경도: {longitude}");
             state.text = $"위도: {latitude}, 경도: {longitude}";
 
+            Vector2 gridXY = KMA_GridConverter.LatLonToGrid(latitude, longitude);
+            int nx = (int)gridXY.x;
+            int ny = (int)gridXY.y;
+            Debug.Log($"격자 좌표: nx = {nx}, ny = {ny}");
+
+            baseDate = DateTime.Now.ToString(("yyyyMMdd"));
+            baseTime = DateTime.Now.ToString(("HHmm"));
+            //_getAPI.StartGetWeather(baseDate, baseTime, nx, ny);
+
             // 날씨 API로 넘어가기
-            StartCoroutine(GetWeather(latitude, longitude));
+            //StartCoroutine(GetWeather(latitude, longitude));
+            StartCoroutine(GetWeather(baseDate, baseTime, nx, ny));
         }
 
         Input.location.Stop(); // 위치 서비스 종료
     }
 
     [System.Serializable]
-    public class Weather
+    public class WeatherItem
     {
-        public string main; // "Rain", "Clear", 등
+        public string category;
+        public string obsrValue;
     }
 
     [System.Serializable]
-    public class WeatherData
+    public class WeatherItemList
     {
-        public Weather[] weather;
+        public List<WeatherItem> item;
     }
 
-    IEnumerator GetWeather(float lat, float lon)
+    [System.Serializable]
+    public class WeatherItems
     {
-        string apiKey = "6d6e46e067938e1eb676e7b2aaf1d827";
-        string url = $"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={apiKey}&units=metric";
+        public WeatherItemList itemList;
+    }
 
-        UnityWebRequest www = UnityWebRequest.Get(url);
-        yield return www.SendWebRequest();
+    [System.Serializable]
+    public class WeatherBody
+    {
+        public WeatherItems items;
+    }
 
-        if (www.result == UnityWebRequest.Result.Success)
+    [System.Serializable]
+    public class WeatherResponse
+    {
+        public WeatherBody body;
+    }
+
+    [System.Serializable]
+    public class WeatherRoot
+    {
+        public WeatherResponse response;
+    }
+
+    IEnumerator GetWeather(string baseDate, string baseTime, int nx = 60, int ny = 127)
+    {
+        string serviceKey = "";
+        string url = $"https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst"
+            + $"?serviceKey={serviceKey}"
+            + $"&pageNo=1&numOfRows=1000&dataType=JSON"
+            + $"&base_date={baseDate}&base_time={baseTime}&nx={nx}&ny={ny}";
+
+        UnityWebRequest request = UnityWebRequest.Get(url);
+        yield return request.SendWebRequest();
+
+        if (request.result == UnityWebRequest.Result.Success)
         {
-            string json = www.downloadHandler.text;
-            WeatherData weatherData = JsonUtility.FromJson<WeatherData>(FixJson(json));
+            string rawJson = request.downloadHandler.text;
+            string fixedJson = FixJson(rawJson);
 
-            string weather = weatherData.weather[0].main;
-            Debug.Log($"현재 날씨: {weather}");
-            state.text = $"현재 날씨: {weather}";
+            WeatherRoot root = JsonUtility.FromJson<WeatherRoot>(fixedJson);
+            var items = root.response.body.items.itemList.item;
 
-            ApplyWeatherEffect(weather);
+            int resultT = 0;
+            int resultR = 0;
+            int resultC = 0;
+
+            foreach (var item in items)
+            {
+                if (item.category == "T1H")
+                    resultT = int.Parse(item.obsrValue);
+                else if (item.category == "PTY")
+                    resultR = int.Parse(item.obsrValue);
+                else if (item.category == "SKY")
+                    resultC = int.Parse(item.obsrValue);
+            }
+
+            ApplyWeatherRainyEffect(resultR); 
+            ApplyWeatherCloudEffect(resultC);
         }
         else
         {
-            Debug.Log("날씨 정보 요청 실패: " + www.error);
+            Debug.LogError(request.error);
             
-            state.text = "날씨 정보 요청 실패: " + www.error;
+            state.text = "날씨 정보 요청 실패: " + request.error;
         }
     }
 
@@ -120,19 +184,43 @@ public class GameManager : MonoBehaviour
         return value;
     }
 
-    void ApplyWeatherEffect(string weather)
+    void ApplyWeatherRainyEffect(int weather)
     {
         switch (weather)
         {
-            case "Clear":
+            case 0:
                 Sunny();
                 break;
 
-            case "Rain":
+            case 1: case 2: case 4:
                 Rain();
                 break;
                 
-            case "Clouds":
+            case 3:
+                Snow();
+                break;
+
+            default:
+                sunny.SetActive(false);
+                rain.SetActive(false);
+                cloud.SetActive(false);
+                break;
+        }
+    }
+    void ApplyWeatherCloudEffect(int weather)
+    {
+        if (nowWeather == WeatherState.Sunny)
+        switch (weather)
+        {
+            case 1:
+                Sunny();
+                break;
+
+            case 3:
+                Rain();
+                break;
+                
+            case 4:
                 Cloud();
                 break;
 
@@ -149,6 +237,8 @@ public class GameManager : MonoBehaviour
         rain.SetActive(false);
         cloud.SetActive(false);
 
+        nowWeather = WeatherState.Sunny;
+
         RenderSettings.skybox = lightskybox;
     }
     
@@ -156,6 +246,8 @@ public class GameManager : MonoBehaviour
         sunny.SetActive(false);
         rain.SetActive(true);
         cloud.SetActive(false);
+        
+        nowWeather = WeatherState.Rainy;
 
         RenderSettings.skybox = cloudskybox;
     }
@@ -164,6 +256,17 @@ public class GameManager : MonoBehaviour
         sunny.SetActive(false);
         rain.SetActive(false);
         cloud.SetActive(true);
+        
+        nowWeather = WeatherState.Cloudy;
+
+        RenderSettings.skybox = cloudskybox;
+    }
+    private void Snow(){
+        sunny.SetActive(false);
+        rain.SetActive(false);
+        cloud.SetActive(true);
+        
+        nowWeather = WeatherState.Snowy;
 
         RenderSettings.skybox = cloudskybox;
     }

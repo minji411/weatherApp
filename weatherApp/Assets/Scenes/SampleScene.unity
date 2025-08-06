@@ -362,8 +362,11 @@ MonoBehaviour:
   cloud: {fileID: 12766645}
   state: {fileID: 2088868535}
   time: {fileID: 591202684}
+  baseDate: 
+  baseTime: 
   lightskybox: {fileID: 2100000, guid: 1e5e82b01cae80b44b78975b9c2d7741, type: 2}
   cloudskybox: {fileID: 2100000, guid: f2b5f3f20933f434e850db1b710542fd, type: 2}
+  nowWeather: 0
 --- !u!114 &113943561
 MonoBehaviour:
   m_ObjectHideFlags: 0
