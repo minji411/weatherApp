@@ -22,6 +22,7 @@ public class GameManager : MonoBehaviour
     public GameObject snow;
     public Text state;
     public Text time;
+    public Text nowWeatherText;
     public string baseDate;
     public string baseTime;
 
@@ -40,6 +41,7 @@ public class GameManager : MonoBehaviour
     void Update()
     {
         time.text = DateTime.Now.ToString(("yyyy-MM-dd tt HH:mm:ss"));
+        nowWeatherText.text = $"{nowWeather}";
     }
 
     bool WaitCondition()
@@ -138,6 +140,8 @@ public class GameManager : MonoBehaviour
     IEnumerator GetWeather(string baseDate, string baseTime, int nx = 60, int ny = 127)
     {
         string serviceKey = "vgmMOjb9HXtZVJOcHkChOttoFTbGqaTPIXoECVG7JG17ggjxxKhctweGOp02xjAKQwHeXxcB3op4yfT4b6mc9Q%3D%3D";
+        //vgmMOjb9HXtZVJOcHkChOttoFTbGqaTPIXoECVG7JG17ggjxxKhctweGOp02xjAKQwHeXxcB3op4yfT4b6mc9Q
+
         string url = $"https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst"
             + $"?serviceKey={serviceKey}"
             + $"&pageNo=1&numOfRows=1000&dataType=JSON"
@@ -190,6 +194,7 @@ public class GameManager : MonoBehaviour
         sunny.SetActive(false);
         rain.SetActive(false);
         cloud.SetActive(false);
+        snow.SetActive(false);
         switch (weather)
         {
             case 0:
@@ -217,18 +222,25 @@ public class GameManager : MonoBehaviour
     {
         if (nowWeather == WeatherState.Sunny)
         {
+            sunny.SetActive(false);
+            rain.SetActive(false);
+            cloud.SetActive(false);
+            snow.SetActive(false);
             switch (weather)
             {
                 case 1:
+                    sunny.SetActive(true);
                     RenderSettings.skybox = lightskybox;
                     break;
 
                 case 3:
+                    cloud.SetActive(true);
                     RenderSettings.skybox = littlecloudskybox;
                     nowWeather = WeatherState.Cloudy;
                     break;
 
                 case 4:
+                    cloud.SetActive(true);
                     RenderSettings.skybox = cloudskybox;
                     nowWeather = WeatherState.Cloudy;
                     break;
